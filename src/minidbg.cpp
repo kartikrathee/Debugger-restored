@@ -35,3 +35,22 @@ public:
         return regs.rip - m_load_address;
     }
 
+    dwarf::taddr deref_size (dwarf::taddr address, unsigned size) override {
+        //TODO take into account size
+        return ptrace(PTRACE_PEEKDATA, m_pid, address + m_load_address, nullptr);
+    }
+
+private:
+    pid_t m_pid;
+    uint64_t m_load_address;
+};
+template class std::initializer_list<dwarf::taddr>;
+void debugger::read_variables() {
+    using namespace dwarf;
+
+    auto func = get_function_from_pc(get_offset_pc());
+
+    for (const auto& die : func) {
+        if (die.tag == DW_TAG::variable) {
+            auto loc_val = die[DW_AT::location];
+
