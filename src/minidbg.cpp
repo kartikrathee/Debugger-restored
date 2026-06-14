@@ -73,3 +73,40 @@ void debugger::read_variables() {
                     auto value = get_register_value_from_dwarf_register(m_pid, result.value);
                     std::cout << at_name(die) << " (reg " << result.value << ") = " << value << std::endl;
                     break;
+                }
+
+                default:
+                    throw std::runtime_error{"Unhandled variable location"};
+                }
+            }
+            else {
+                throw std::runtime_error{"Unhandled variable location"};
+            }
+        }
+    }
+}
+
+
+void debugger::print_backtrace() {
+    auto output_frame = [frame_number = 0] (auto&& func) mutable {
+        std::cout << "frame #" << frame_number++ << ": 0x" << dwarf::at_low_pc(func)
+                  << ' ' << dwarf::at_name(func) << std::endl;
+    };
+
+    auto current_func = get_function_from_pc(offset_load_address(get_pc()));
+    output_frame(current_func);
+
+    auto frame_pointer = get_register_value(m_pid, reg::rbp);
+    auto return_address = read_memory(frame_pointer+8);
+
+    while (dwarf::at_name(current_func) != "main") {
+        current_func = get_function_from_pc(offset_load_address(return_address));
+        output_frame(current_func);
+        frame_pointer = read_memory(frame_pointer);
+        return_address = read_memory(frame_pointer+8);
+    }
+}
+
+symbol_type to_symbol_type(elf::stt sym) {
+    switch (sym) {
+    case elf::stt::notype: return symbol_type::notype;
