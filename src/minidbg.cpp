@@ -110,3 +110,41 @@ void debugger::print_backtrace() {
 symbol_type to_symbol_type(elf::stt sym) {
     switch (sym) {
     case elf::stt::notype: return symbol_type::notype;
+    case elf::stt::object: return symbol_type::object;
+    case elf::stt::func: return symbol_type::func;
+    case elf::stt::section: return symbol_type::section;
+    case elf::stt::file: return symbol_type::file;
+    default: return symbol_type::notype;
+    }
+};
+
+std::vector<symbol> debugger::lookup_symbol(const std::string& name) {
+   std::vector<symbol> syms;
+
+   for (auto& sec : m_elf.sections()) {
+      if (sec.get_hdr().type != elf::sht::symtab && sec.get_hdr().type != elf::sht::dynsym)
+         continue;
+
+      for (auto sym : sec.as_symtab()) {
+         if (sym.get_name() == name) {
+            auto& d = sym.get_data();
+            syms.push_back(symbol{ to_symbol_type(d.type()), sym.get_name(), d.value });
+         }
+      }
+   }
+
+   return syms;
+}
+
+void debugger::initialise_load_address() {
+   //If this is a dynamic library (e.g. PIE)
+   if (m_elf.get_hdr().type == elf::et::dyn) {
+      //The load address is found in /proc/<pid>/maps
+      std::ifstream map("/proc/" + std::to_string(m_pid) + "/maps");
+
+      //Read the first address from the file
+      std::string addr;
+      std::getline(map, addr, '-');
+
+      m_load_address = std::stoi(addr, 0, 16);
+   }
