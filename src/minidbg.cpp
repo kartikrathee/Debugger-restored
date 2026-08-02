@@ -223,3 +223,41 @@ void debugger::step_over() {
 
     for (auto addr : to_delete) {
         remove_breakpoint(addr);
+    }
+}
+
+void debugger::single_step_instruction() {
+    ptrace(PTRACE_SINGLESTEP, m_pid, nullptr, nullptr);
+    wait_for_signal();
+}
+
+void debugger::single_step_instruction_with_breakpoint_check() {
+    //first, check to see if we need to disable and enable a breakpoint
+    if (m_breakpoints.count(get_pc())) {
+        step_over_breakpoint();
+    }
+    else {
+        single_step_instruction();
+    }
+}
+
+uint64_t debugger::read_memory(uint64_t address) {
+    return ptrace(PTRACE_PEEKDATA, m_pid, address, nullptr);
+}
+
+void debugger::write_memory(uint64_t address, uint64_t value) {
+    ptrace(PTRACE_POKEDATA, m_pid, address, value);
+}
+
+uint64_t debugger::get_pc() {
+    return get_register_value(m_pid, reg::rip);
+}
+
+uint64_t debugger::get_offset_pc() {
+   return offset_load_address(get_pc());
+}
+
+void debugger::set_pc(uint64_t pc) {
+    set_register_value(m_pid, reg::rip, pc);
+}
+
