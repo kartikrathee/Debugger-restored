@@ -261,3 +261,41 @@ void debugger::set_pc(uint64_t pc) {
     set_register_value(m_pid, reg::rip, pc);
 }
 
+dwarf::die debugger::get_function_from_pc(uint64_t pc) {
+    for (auto &cu : m_dwarf.compilation_units()) {
+        if (die_pc_range(cu.root()).contains(pc)) {
+            for (const auto& die : cu.root()) {
+                if (die.tag == dwarf::DW_TAG::subprogram) {
+                    if (die_pc_range(die).contains(pc)) {
+                        return die;
+                    }
+                }
+            }
+        }
+    }
+
+    throw std::out_of_range{"Cannot find function"};
+}
+
+dwarf::line_table::iterator debugger::get_line_entry_from_pc(uint64_t pc) {
+    for (auto &cu : m_dwarf.compilation_units()) {
+        if (die_pc_range(cu.root()).contains(pc)) {
+            auto &lt = cu.get_line_table();
+            auto it = lt.find_address(pc);
+            if (it == lt.end()) {
+                throw std::out_of_range{"Cannot find line entry"};
+            }
+            else {
+                return it;
+            }
+        }
+    }
+
+    throw std::out_of_range{"Cannot find line entry"};
+}
+
+void debugger::print_source(const std::string& file_name, unsigned line, unsigned n_lines_context) {
+    std::ifstream file {file_name};
+
+    //Work out a window around the desired line
+    auto start_line = line <= n_lines_context ? 1 : line - n_lines_context;
