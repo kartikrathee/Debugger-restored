@@ -299,3 +299,40 @@ void debugger::print_source(const std::string& file_name, unsigned line, unsigne
 
     //Work out a window around the desired line
     auto start_line = line <= n_lines_context ? 1 : line - n_lines_context;
+    auto end_line = line + n_lines_context + (line < n_lines_context ? n_lines_context - line : 0) + 1;
+
+    char c{};
+    auto current_line = 1u;
+    //Skip lines up until start_line
+    while (current_line != start_line && file.get(c)) {
+        if (c == '\n') {
+            ++current_line;
+        }
+    }
+
+    //Output cursor if we're at the current line
+    std::cout << (current_line==line ? "> " : "  ");
+
+    //Write lines up until end_line
+    while (current_line <= end_line && file.get(c)) {
+        std::cout << c;
+        if (c == '\n') {
+            ++current_line;
+            //Output cursor if we're at the current line
+            std::cout << (current_line==line ? "> " : "  ");
+        }
+    }
+
+    //Write newline and make sure that the stream is flushed properly
+    std::cout << std::endl;
+}
+
+siginfo_t debugger::get_signal_info() {
+    siginfo_t info;
+    ptrace(PTRACE_GETSIGINFO, m_pid, nullptr, &info);
+    return info;
+}
+
+void debugger::step_over_breakpoint() {
+    if (m_breakpoints.count(get_pc())) {
+        auto& bp = m_breakpoints[get_pc()];
