@@ -336,3 +336,41 @@ siginfo_t debugger::get_signal_info() {
 void debugger::step_over_breakpoint() {
     if (m_breakpoints.count(get_pc())) {
         auto& bp = m_breakpoints[get_pc()];
+        if (bp.is_enabled()) {
+            bp.disable();
+            ptrace(PTRACE_SINGLESTEP, m_pid, nullptr, nullptr);
+            wait_for_signal();
+            bp.enable();
+        }
+    }
+}
+
+void debugger::wait_for_signal() {
+    int wait_status;
+    auto options = 0;
+    waitpid(m_pid, &wait_status, options);
+
+    auto siginfo = get_signal_info();
+
+    switch (siginfo.si_signo) {
+    case SIGTRAP:
+        handle_sigtrap(siginfo);
+        break;
+    case SIGSEGV:
+        std::cout << "Yay, segfault. Reason: " << siginfo.si_code << std::endl;
+        break;
+    default:
+        std::cout << "Got signal " << strsignal(siginfo.si_signo) << std::endl;
+    }
+}
+
+void debugger::handle_sigtrap(siginfo_t info) {
+    switch (info.si_code) {
+        //one of these will be set if a breakpoint was hit
+    case SI_KERNEL:
+    case TRAP_BRKPT:
+    {
+        set_pc(get_pc()-1);
+        std::cout << "Hit breakpoint at address 0x" << std::hex << get_pc() << std::endl;
+        auto offset_pc = offset_load_address(get_pc()); //rember to offset the pc for querying DWARF
+        auto line_entry = get_line_entry_from_pc(offset_pc);
