@@ -374,3 +374,40 @@ void debugger::handle_sigtrap(siginfo_t info) {
         std::cout << "Hit breakpoint at address 0x" << std::hex << get_pc() << std::endl;
         auto offset_pc = offset_load_address(get_pc()); //rember to offset the pc for querying DWARF
         auto line_entry = get_line_entry_from_pc(offset_pc);
+        print_source(line_entry->file->path, line_entry->line);
+        return;
+    }
+    //this will be set if the signal was sent by single stepping
+    case TRAP_TRACE:
+        return;
+    default:
+        std::cout << "Unknown SIGTRAP code " << info.si_code << std::endl;
+        return;
+    }
+}
+
+void debugger::continue_execution() {
+    step_over_breakpoint();
+    ptrace(PTRACE_CONT, m_pid, nullptr, nullptr);
+    wait_for_signal();
+}
+
+void debugger::dump_registers() {
+    for (const auto& rd : g_register_descriptors) {
+        std::cout << rd.name << " 0x"
+                  << std::setfill('0') << std::setw(16) << std::hex << get_register_value(m_pid, rd.r) << std::endl;
+    }
+}
+
+std::vector<std::string> split(const std::string &s, char delimiter) {
+    std::vector<std::string> out{};
+    std::stringstream ss {s};
+    std::string item;
+
+    while (std::getline(ss,item,delimiter)) {
+        out.push_back(item);
+    }
+
+    return out;
+}
+
