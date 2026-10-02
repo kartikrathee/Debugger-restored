@@ -411,3 +411,41 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
     return out;
 }
 
+bool is_prefix(const std::string& s, const std::string& of) {
+    if (s.size() > of.size()) return false;
+    return std::equal(s.begin(), s.end(), of.begin());
+}
+
+void debugger::handle_command(const std::string& line) {
+    auto args = split(line,' ');
+    auto command = args[0];
+
+    if (is_prefix(command, "cont")) {
+        continue_execution();
+    }
+    else if(is_prefix(command, "break")) {
+        if (args[1][0] == '0' && args[1][1] == 'x') {
+            std::string addr {args[1], 2};
+            set_breakpoint_at_address(std::stol(addr, 0, 16));
+        }
+        else if (args[1].find(':') != std::string::npos) {
+            auto file_and_line = split(args[1], ':');
+            set_breakpoint_at_source_line(file_and_line[0], std::stoi(file_and_line[1]));
+        }
+        else {
+            set_breakpoint_at_function(args[1]);
+        }
+    }
+    else if(is_prefix(command, "step")) {
+        step_in();
+    }
+    else if(is_prefix(command, "next")) {
+        step_over();
+    }
+    else if(is_prefix(command, "finish")) {
+        step_out();
+    }
+
+    else if(is_prefix(command, "step")) {
+        step_in();
+    }
