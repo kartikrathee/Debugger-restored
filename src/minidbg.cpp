@@ -486,3 +486,41 @@ void debugger::handle_command(const std::string& line) {
     else if(is_prefix(command, "memory")) {
         std::string addr {args[2], 2}; //assume 0xADDRESS
 
+        if (is_prefix(args[1], "read")) {
+            std::cout << std::hex << read_memory(std::stol(addr, 0, 16)) << std::endl;
+        }
+        if (is_prefix(args[1], "write")) {
+            std::string val {args[3], 2}; //assume 0xVAL
+            write_memory(std::stol(addr, 0, 16), std::stol(val, 0, 16));
+        }
+    }
+
+    else if(is_prefix(command, "variables")) {
+        read_variables();
+    }
+
+    else if(is_prefix(command, "backtrace")) {
+        print_backtrace();
+    }
+    else if(is_prefix(command, "symbol")) {
+        auto syms = lookup_symbol(args[1]);
+        for (auto&& s : syms) {
+            std::cout << s.name << ' ' << to_string(s.type) << " 0x" << std::hex << s.addr << std::endl;
+        }
+    }
+    else if(is_prefix(command, "stepi")) {
+        single_step_instruction_with_breakpoint_check();
+        auto line_entry = get_line_entry_from_pc(get_pc());
+        print_source(line_entry->file->path, line_entry->line);
+    }
+    else {
+        std::cerr << "Unknown command\n";
+    }
+}
+
+bool is_suffix(const std::string& s, const std::string& of) {
+    if (s.size() > of.size()) return false;
+    auto diff = of.size() - s.size();
+    return std::equal(s.begin(), s.end(), of.begin() + diff);
+}
+
