@@ -524,3 +524,41 @@ bool is_suffix(const std::string& s, const std::string& of) {
     return std::equal(s.begin(), s.end(), of.begin() + diff);
 }
 
+void debugger::set_breakpoint_at_function(const std::string& name) {
+    for (const auto& cu : m_dwarf.compilation_units()) {
+        for (const auto& die : cu.root()) {
+            if (die.has(dwarf::DW_AT::name) && at_name(die) == name) {
+                auto low_pc = at_low_pc(die);
+                auto entry = get_line_entry_from_pc(low_pc);
+                ++entry; //skip prologue
+                set_breakpoint_at_address(offset_dwarf_address(entry->address));
+            }
+        }
+    }
+}
+
+void debugger::set_breakpoint_at_source_line(const std::string& file, unsigned line) {
+    for (const auto& cu : m_dwarf.compilation_units()) {
+        if (is_suffix(file, at_name(cu.root()))) {
+            const auto& lt = cu.get_line_table();
+
+            for (const auto& entry : lt) {
+                if (entry.is_stmt && entry.line == line) {
+                    set_breakpoint_at_address(offset_dwarf_address(entry.address));
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void debugger::set_breakpoint_at_address(std::intptr_t addr) {
+    std::cout << "Set breakpoint at address 0x" << std::hex << addr << std::endl;
+    breakpoint bp {m_pid, addr};
+    bp.enable();
+    m_breakpoints[addr] = bp;
+}
+
+void debugger::run() {
+    wait_for_signal();
+    initialise_load_address();
